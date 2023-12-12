@@ -1,5 +1,6 @@
 const mysql = require('mysql');
 const dotenv = require('dotenv');
+const ftp = require("basic-ftp");
 const path = require("path");
 let instance = null;
 const { env } = process;
@@ -30,6 +31,104 @@ connection.connect((err)=>{
 class DbService{
     static getDbServiceInstance(){
         return instance ? instance : new DbService();
+    }
+    async downloadFile(filePath,file,res){
+        try{
+            const client = new ftp.Client();
+            const remoteFilePath = path.join(filePath, fileName); 
+            const localFilePath = path.join(__dirname, 'uploads', fileName);
+            await client.access({
+                host: "192.168.10.69",
+                user: "FWdb\\administrator",
+                password: "Glorypty@123",
+                secure: false 
+            });
+            await client.downloadTo(remoteFilePath, localFilePath);
+      
+            // Send the file to the client
+            res.download('uploads', file);
+        }catch (error){
+            console.log(error);
+        }
+        
+    }
+    async uploadFileL(filePath,file){
+        try{
+            const response = await new Promise(async(resolve,reject)=>{
+                var fileName=file.name;
+                //const remoteFilePath = path.join(filePath, fileName); // Replace 'filename.jpg' with the desired file name
+                
+                const localFilePath = path.join('Z:\\server','test', fileName); // Save the uploaded file to the 'uploads' directory
+                file.mv(localFilePath, async function(err) {
+                    if (err) {
+                        console.error('Error saving file:', err);
+                        reject(new Error(err.message));
+                        resolve({
+                            status:500,
+                            message:'Error saving file '+__dirname,
+                            error:err
+                        });
+                    }
+            
+                    
+                });
+            });
+            return response;
+        }catch (error){
+            console.log(error);
+        }
+        
+    }
+    async uploadFile(filePath,file){
+        try{
+            const response = await new Promise(async(resolve,reject)=>{
+                var fileName=file.name;
+                const remoteFilePath = path.join(filePath, fileName); // Replace 'filename.jpg' with the desired file name
+                const client = new ftp.Client();
+                await client.access({
+                    host: "192.168.10.69",
+                    user: "FWdb\\administrator",
+                    password: "Glorypty@123",
+                    secure: false 
+                });
+            
+                const localFilePath = path.join(__dirname, 'uploads', fileName); // Save the uploaded file to the 'uploads' directory
+                file.mv(localFilePath, async function(err) {
+                    if (err) {
+                        console.error('Error saving file:', err);
+                        reject(new Error(err.message));
+                        resolve({
+                            status:500,
+                            message:'Error saving file '+fileName,
+                            error:err
+                        });
+                    }
+            
+                    try {
+                        await client.uploadFrom(localFilePath, remoteFilePath);
+                        console.log('File uploaded successfully to FTP server '+fileName);
+                        resolve({
+                            status:200,
+                            message:'File uploaded successfully '+fileName
+                        });
+                    } catch (err) {
+                        console.error('Error uploading file to FTP server:', err);
+                        reject(new Error(err.message));
+                        resolve({
+                            status:500,
+                            message:'Error uploading file to FTP server '+fileName,
+                            error:err
+                        });
+                    } finally {
+                        client.close();
+                    }
+                });
+            });
+            return response;
+        }catch (error){
+            console.log(error);
+        }
+        
     }
     //#region 选择
     async getBasic(columnData){

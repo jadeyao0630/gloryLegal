@@ -12,6 +12,8 @@ const multer = require('multer');
 const ftp = require("basic-ftp");
 const fs = require("fs");
 
+const _ftp = require('ftp');
+
 var iconv = require('iconv-lite');
 
 const path = require('path');
@@ -46,104 +48,107 @@ app.use(fileUpload({
 //app.use(express.urlencoded({extended:false}));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-
-async function uploadFileToFTP(from, to) {
-    const client = new ftp.Client();
-  
-    try {
-      // Connect to the FTP server
-      await client.access({
-        host: "192.168.10.241",
-        user: "luke",
-        password: "Qijiashe6",
-        secure: false // Set to true if using FTPS
-      });
-  
-  
-      // Read the local file
-      const fileData = await fs.promises.readFile(from);
-  
-      // Upload the file to the FTP server
-      await client.uploadFrom(fileData, to);
-  
-      console.log("File uploaded successfully to FTP server");
-    } catch (err) {
-      console.error("Error uploading file to FTP server:", err);
-    } finally {
-      // Close the FTP client connection
-      client.close();
+app.get('/download1', (req, res) => {
+  const filePath = 'uploads/国瑞信息软件表.xlsx';
+  res.download(filePath, '国瑞信息软件表.xlsx', (err) => {
+    if (err) {
+      res.status(500).send('Error downloading file');
     }
-  }
-  app.get('/getFileWithCustomName', (req, res) => {
-    const filePath = req.query.filePath; // 从查询参数中获取文件路径
-    const customFileName = req.query.customFileName; // 从查询参数中获取指定的文件名
-  
-    const fileStream = fs.createReadStream(filePath);
-    res.setHeader('Content-Disposition', `attachment; filename="${customFileName}"`);
-    res.setHeader('Content-Type', 'application/octet-stream');
-  
-    fileStream.pipe(res);
   });
+});
   app.get('/download', async (req, res) => {
-    const client = new ftp.Client();
-    try {
-      // Connect to the FTP server
-      await client.access({
-        host: "192.168.10.241",
-        user: "luke",
-        password: "Qijiashe6",
-        secure: false 
-      });
-  
-      // Download the file from the FTP server
-      await client.downloadTo(res, '/path/to/file');
-  
-      // Send the file to the client
-      res.download('/path/to/file', 'filename.ext');
-    } catch (err) {
-      console.log(err);
-      res.status(500).send('Error downloading file from FTP server');
-    }
-    client.close();
+    const client = new _ftp();
+    const remoteFilePath = '/Downloads/1.xlsx';
+    const localFilePath = './uploads/1.xlsx';
+
+    await client.connect({
+      host: "192.168.10.69",
+      user: "FWdb\\administrator",
+      password: "Glorypty@123",
   });
-  app.post('/upload', async (req, res) => {
-    const client = new ftp.Client();
+
+    client.on('ready', () => {
+      client.get(remoteFilePath, (err, stream) => {
+        if (err) {
+          res.status(500).send('Error downloading file');
+        } else {
+          stream.pipe(fs.createWriteStream(localFilePath));
+          stream.on('end', () => {
+            res.download(localFilePath, '1.xlsx', (err) => {
+              if (err) {
+                res.status(500).send('Error downloading file');
+              }
+              client.end();
+            });
+          });
+        }
+      });
+    });
+
+    client.on('error', (err) => {
+      res.status(500).send('Error connecting to FTP server');
+    });
+  });
+  app.post('/upload1s', async (req, res) => {
     try {
       if (!req.files || Object.keys(req.files).length === 0) {
-        return res.status(400).send('No files were uploaded.');
+        //return res.status(400).send('No files were uploaded.');
+        res.json({
+          status:400,
+          message:'No files were uploaded.',
+        });
       }
   
       const file = req.files.file;
-      const remoteFilePath = '/Downloads/'+file.name; // Replace 'filename.jpg' with the desired file name
-  
-      await client.access({
-        host: "192.168.10.241",
-        user: "luke",
-        password: "Qijiashe6",
-        secure: false 
-      });
-  
-      const localFilePath = path.join(__dirname, 'uploads', file.name); // Save the uploaded file to the 'uploads' directory
-      file.mv(localFilePath, async function(err) {
-        if (err) {
-          console.error('Error saving file:', err);
-          return res.status(500).send('Error saving file');
-        }
-  
-        try {
-          await client.uploadFrom(localFilePath, remoteFilePath);
-          console.log('File uploaded successfully to FTP server');
-          res.status(200).send(file.name+' File uploaded successfully'+file.name);
-        } catch (err) {
-          console.error('Error uploading file to FTP server:', err);
-          res.status(500).send('Error uploading file to FTP server');
-        } finally {
-          client.close();
-        }
-      });
+      const filePath=req.body.filePath;
+      const  db= DbService.getDbServiceInstance();
+      const result = db.uploadFileL(filePath,file);
+      result
+      .then(data => {
+        console.log(filePath);
+        res.json(data);
+      } )
+      .catch(err => console.log(err));
+      
     } catch (err) {
       console.error('Error handling file upload:', err);
-      res.status(500).send('Error handling file upload');
+      //res.status(500).send('Error handling file upload');
+      res.json({
+        status:500,
+        message:'Error handling file upload',
+        error:err
+      });
+    }
+  });
+  app.post('/upload', async (req, res) => {
+    try {
+      if (!req.files || Object.keys(req.files).length === 0) {
+        //return res.status(400).send('No files were uploaded.');
+        res.json({
+          status:400,
+          message:'No files were uploaded.',
+        });
+      }
+  
+      const file = req.files.file;
+      const filePath=req.body.filePath;
+      const  db= DbService.getDbServiceInstance();
+      const result = db.uploadFile(filePath,file);
+      result
+      .then(data => {
+        console.log(filePath);
+        res.json(data);
+      } )
+      .catch(err => console.log(err));
+      
+    } catch (err) {
+      console.error('Error handling file upload:', err);
+      //res.status(500).send('Error handling file upload');
+      res.json({
+        status:500,
+        message:'Error handling file upload',
+        error:err
+      });
     }
   });
 // create
