@@ -1,6 +1,5 @@
 const mysql = require('mysql');
 const dotenv = require('dotenv');
-const ftp = require("basic-ftp");
 const path = require("path");
 let instance = null;
 const { env } = process;
@@ -13,7 +12,7 @@ dotenv.config({
 
 const connection = mysql.createConnection({
     host: env.HOST,
-    user:'glory',
+    user:'root',
     password:env.PASSWORD,
     database:env.DATABASE,
     por:env.DB_PORT,
@@ -32,113 +31,11 @@ class DbService{
     static getDbServiceInstance(){
         return instance ? instance : new DbService();
     }
-    async downloadFile(filePath,file,res){
-        try{
-            const client = new ftp.Client();
-            const remoteFilePath = path.join(filePath, fileName); 
-            const localFilePath = path.join(__dirname, 'uploads', fileName);
-            await client.access({
-                host: "192.168.10.69",
-                user: "FWdb\\administrator",
-                password: "Glorypty@123",
-                secure: false 
-            });
-            await client.downloadTo(remoteFilePath, localFilePath);
-      
-            // Send the file to the client
-            res.download('uploads', file);
-        }catch (error){
-            console.log(error);
-        }
-        
-    }
-    async uploadFileL(rootPath,folder,file){
-        try{
-            const response = await new Promise(async(resolve,reject)=>{
-                var fileName=file.name;
-                //const remoteFilePath = path.join(filePath, fileName); // Replace 'filename.jpg' with the desired file name
-                
-                const localFilePath = path.join(rootPath,folder, fileName); // Save the uploaded file to the 'uploads' directory
-                file.mv(localFilePath, async function(err) {
-                    if (err) {
-                        console.error('Error saving file:', err);
-                        reject(new Error(err.message));
-                        resolve({
-                            status:500,
-                            message:'Error saving file '+fileName,
-                            error:err
-                        });
-                    }
-                    resolve({
-                        status:200,
-                        message:'File uploaded successfully '+fileName
-                    });
-                    
-                });
-            });
-            return response;
-        }catch (error){
-            console.log(error);
-        }
-        
-    }
-    async uploadFile(filePath,file){
-        try{
-            const response = await new Promise(async(resolve,reject)=>{
-                var fileName=file.name;
-                const remoteFilePath = path.join(filePath, fileName); // Replace 'filename.jpg' with the desired file name
-                const client = new ftp.Client();
-                await client.access({
-                    host: "192.168.10.69",
-                    user: "FWdb\\administrator",
-                    password: "Glorypty@123",
-                    secure: false 
-                });
-            
-                const localFilePath = path.join(__dirname, 'uploads', fileName); // Save the uploaded file to the 'uploads' directory
-                file.mv(localFilePath, async function(err) {
-                    if (err) {
-                        console.error('Error saving file:', err);
-                        reject(new Error(err.message));
-                        resolve({
-                            status:500,
-                            message:'Error saving file '+fileName,
-                            error:err
-                        });
-                    }
-            
-                    try {
-                        await client.uploadFrom(localFilePath, remoteFilePath);
-                        console.log('File uploaded successfully to FTP server '+fileName);
-                        resolve({
-                            status:200,
-                            message:__dirname+' File uploaded successfully '+fileName
-                        });
-                    } catch (err) {
-                        console.error('Error uploading file to FTP server:', err);
-                        reject(new Error(err.message));
-                        resolve({
-                            status:500,
-                            message:'Error uploading file to FTP server '+fileName,
-                            error:err
-                        });
-                    } finally {
-                        client.close();
-                    }
-                });
-            });
-            return response;
-        }catch (error){
-            console.log(error);
-        }
-        
-    }
     //#region 选择
-    async getBasic(columnData){
+    async getBasic(tablename){
         try{
             const response = await new Promise((resolve,reject)=>{
-                const query = "SELECT * FROM "+columnData.tablename+
-                    (columnData.conditions!=undefined?columnData.conditions:"");
+                const query = "SELECT * FROM "+tablename;
                 connection.query(query, (err,results)=>{
                     if (err) reject(new Error(err.message));
                     resolve(results);
@@ -237,13 +134,24 @@ class DbService{
     }
     //#endregion 创建
     //#region 插入
-    async insertNewCase(query){
+    async insertNewCase(table,data){
         try{
-            
+            //console.log(name);
+            const dateAdded = new Date();
+            var keys=Object.keys(data);
+            //var keys_str=keys.split(",");
+            const values=[];
+            const _values=[];
+            keys.forEach((key)=>{
+                values.push(data[key]);
+                _values.push("?");
+            });
             const insertId = await new Promise((resolve,reject)=>{
-
-                connection.query(query, (err,result)=>{
+                const query = "REPLACE INTO "+table+" ("+keys.join()+") VALUES ("+_values.join()+");";
+                //console.log(query);
+                connection.query(query,values, (err,result)=>{
                     if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
                     resolve(result);
                 });
             });
@@ -252,6 +160,7 @@ class DbService{
             return {
                 success: true,
                 id: insertId,
+                createDate: dateAdded,
             };
         }catch(error){
             console.log(error);
@@ -405,70 +314,7 @@ class DbService{
             console.log(error);
         }
     }
-    async constrolRows(ids,isInactived){
-        try{
-            const response = await new Promise((resolve,reject)=>{
-                //console.log(table);
-                const query = `UPDATE caseStatus SET isInactived=`+isInactived+` WHERE \`id\` IN (`+ids.join()+`);`;
-                connection.query(query, (err,result)=>{
-                    if (err) reject(new Error(err.message));
-                    //console.log(result);
-                    resolve(result);
-                });
-            });
-            
-            //console.log("typeof: "+(typeof response));
-            return {
-                success : response.length>0,
-                data: JSON.stringify(response[0])
-            };
-        }catch(error){
-            console.log(error);
-        }
-    }
-    async constrolItem(where,table,isInactived){
-        try{
-            const response = await new Promise((resolve,reject)=>{
-                const query = `UPDATE `+table+` SET isInactived=`+isInactived+` WHERE `+where;
-                connection.query(query, (err,result)=>{
-                    if (err) reject(new Error(err.message));
-                    //console.log(result);
-                    resolve(result);
-                });
-            });
-            
-            //console.log("typeof: "+(typeof response));
-            return {
-                success : response.length>0,
-                data: JSON.stringify(response[0])
-            };
-        }catch(error){
-            console.log(error);
-        }
-    }
     //#endregion 删除
-
-    async update(where,table,value){
-        try{
-            const response = await new Promise((resolve,reject)=>{
-                const query = `UPDATE `+table+` SET `+value+` WHERE `+where;
-                connection.query(query, (err,result)=>{
-                    if (err) reject(new Error(err.message));
-                    //console.log(result);
-                    resolve(result);
-                });
-            });
-            
-            //console.log("typeof: "+(typeof response));
-            return {
-                success: true,
-                data: response,
-            };
-        }catch(error){
-            console.log(error);
-        }
-    }
-
     //#region 功能
     async login(name, pass){
         try{
@@ -494,3 +340,195 @@ class DbService{
 }
 
 module.exports = DbService;
+
+
+
+const express = require('express');
+const app = express();
+const cors = require('cors');
+const dotenv = require('dotenv');
+const $ = require("jquery");
+
+const path = require('path');
+const { env } = process;
+dotenv.config({
+    path: path.resolve(
+        __dirname,
+        `./env.${env.NODE_ENV ? env.NODE_ENV : "local"}`
+      ),
+});
+
+
+const DbService = require('./dbService');
+
+var corsOptions = {
+    origin: '*',
+    credentials:true,
+    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+  }
+
+app.use(cors(corsOptions)).use((req,res,next)=>{
+    console.log(req);
+    res.setHeader('Access-Control-Allow-Origin',"*");
+    next();
+});
+app.use(express.json());
+app.use(express.urlencoded({extended:false}));
+
+
+
+
+// create
+app.post('/insertUser',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {user} = request.body;
+    const {pass} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertNewUser(user,pass);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insert',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertRow(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insertAll',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertRows(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/createTable',cors(corsOptions),(request,response) => {
+    //console.log("request.body "+request.body.columns);
+    const {columns} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.createTable(table,columns);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insertCase',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertNewCase(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+
+// read
+app.get('/getAll',(request,response) => {
+    const db = DbService.getDbServiceInstance();
+    const result = db.getAllData();
+
+    result
+    .then(data => response.json({data:data}))
+    .catch(err => console.log(err));
+
+});
+app.post('/select',(request,response) => {
+    const {query} = request.body;
+    const db = DbService.getDbServiceInstance();
+    const result = db.select(query);
+
+    result
+    .then(data => response.json({data:data}))
+    .catch(err => console.log(err));
+
+});
+app.post('/getBasic',(request,response) => {
+    const {template} = request.body;
+    const {list} = request.body;
+    const results = {};
+    //console.log(template,list);
+    var keys=Object.keys(template);
+    keys.forEach((k)=>{
+        if(list==undefined || list.length==0 || list.includes(k)){
+            //console.log();
+            
+            const db = DbService.getDbServiceInstance();
+            const result = db.getBasic(template[k].tablename);
+            result
+            .then(data => {
+                console.log("in loop",k,data);
+                results[k]=data;
+            })
+            .catch(err => console.log(err));
+            
+        }else{
+            return;
+        }
+    });
+
+    return new Promise(resolve => {
+        const intervalId = setInterval(() => {
+            console.log('results',Object.keys(results).length);
+        if (Object.keys(results).length === Object.keys(template).length ||
+        (list.length>1 && Object.keys(results).length==list.length)) {
+            clearInterval(intervalId);
+            console.log('results',results);
+            resolve(results);
+            response.json({data:results});
+        }
+        }, 100);
+    });
+
+});
+
+// create
+app.post('/login',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {name} = request.body;
+    const {pass} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.login(name,pass);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+// update
+
+
+// delete
+app.post('/delete',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {id} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.removeRow(id,table);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+app.post('/deleteRows',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {ids} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.removeRows(ids,table);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.listen(process.env.PORT, () => console.log('app is runing at port: '+process.env.PORT))

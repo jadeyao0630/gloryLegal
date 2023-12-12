@@ -48,11 +48,17 @@ app.use(fileUpload({
 //app.use(express.urlencoded({extended:false}));
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.get('/download1', (req, res) => {
-  const filePath = 'uploads/国瑞信息软件表.xlsx';
-  res.download(filePath, '国瑞信息软件表.xlsx', (err) => {
+app.get('/downloadLocal', (req, res) => {
+  const fileName = decodeURIComponent(req.query.fileName);
+  const folder = req.query.folder;
+  //const filePath = 'uploads/国瑞信息软件表.xlsx';
+  res.download(path.join(env.UPLOADS_PATH,folder,fileName), fileName, (err) => {
     if (err) {
-      res.status(500).send('Error downloading file');
+      res.json({
+        status:500,
+        message:'Error downloading file '+fileName,
+        error:err
+      });
     }
   });
 });
@@ -89,7 +95,7 @@ app.get('/download1', (req, res) => {
       res.status(500).send('Error connecting to FTP server');
     });
   });
-  app.post('/upload1s', async (req, res) => {
+  app.post('/uploadLocal', async (req, res) => {
     try {
       if (!req.files || Object.keys(req.files).length === 0) {
         //return res.status(400).send('No files were uploaded.');
@@ -100,12 +106,12 @@ app.get('/download1', (req, res) => {
       }
   
       const file = req.files.file;
-      const filePath=req.body.filePath;
+      const folder=req.body.folder;
       const  db= DbService.getDbServiceInstance();
-      const result = db.uploadFileL(filePath,file);
+      const result = db.uploadFileL(env.UPLOADS_PATH,folder,file);
       result
       .then(data => {
-        console.log(filePath);
+        console.log(folder);
         res.json(data);
       } )
       .catch(err => console.log(err));
