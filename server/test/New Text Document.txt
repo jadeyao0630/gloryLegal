@@ -1,0 +1,534 @@
+const mysql = require('mysql');
+const dotenv = require('dotenv');
+const path = require("path");
+let instance = null;
+const { env } = process;
+dotenv.config({
+    path: path.resolve(
+        __dirname,
+        `./env.${env.NODE_ENV ? env.NODE_ENV : "local"}`
+      ),
+});
+
+const connection = mysql.createConnection({
+    host: env.HOST,
+    user:'root',
+    password:env.PASSWORD,
+    database:env.DATABASE,
+    por:env.DB_PORT,
+    //ssl: true,
+});
+
+connection.connect((err)=>{
+
+    if(err){
+        console.log(err.message);
+    }
+    console.log('db '+ connection.state);
+});
+
+class DbService{
+    static getDbServiceInstance(){
+        return instance ? instance : new DbService();
+    }
+    //#region 选择
+    async getBasic(tablename){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                const query = "SELECT * FROM "+tablename;
+                connection.query(query, (err,results)=>{
+                    if (err) reject(new Error(err.message));
+                    resolve(results);
+                });
+            });
+            
+            //console.log(response);
+            return response;
+        }catch (error){
+            console.log(error);
+        }
+    }
+    async getAllData(){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                const query = "SELECT * FROM names";
+                connection.query(query, (err,results)=>{
+                    if (err) reject(new Error(err.message));
+                    resolve(results);
+                });
+            });
+            
+            //console.log(response);
+            return response;
+        }catch (error){
+            console.log(error);
+        }
+    }
+    async select(query){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                connection.query(query, (err,results)=>{
+                    if (err) reject(new Error(err.message));
+                    resolve(results);
+                });
+            });
+            
+            //console.log(response);
+            return response;
+        }catch (error){
+            console.log(error);
+        }
+    }
+    //#endregion 选择
+    //#region 创建
+    async createTable(table,columns){
+        try{
+            var keys=Object.keys(columns);
+            //var keys_str=keys.split(",");
+            const values=[];
+            const pk=[];
+            const unique=[];
+            keys.forEach((key)=>{
+                var char=columns[key].split(',');
+                if(char.length>0){
+                    if(char.length==1){
+                        values.push(key+" "+char[0]);
+                    }else if(char.length>1){
+                        values.push(key+" "+char[0]);
+                        if(char[1].toUpperCase().includes("PRIMARY KEY")){
+                            pk.push(key);
+                        }else if(char[1].toUpperCase().includes("UNIQUE")){
+                            unique.push(key);
+                        }
+                    }
+                }
+                
+            });
+            if(pk.length>0){
+                values.push("PRIMARY KEY("+pk.join()+")");
+            }
+            if(unique.length>0){
+                values.push("UNIQUE("+unique.join()+")");
+            }
+            //console.log(values);
+            const response = await new Promise((resolve,reject)=>{
+                const query = "CREATE TABLE "+table+" ("+values.join()+");";
+                connection.query(query, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(response);
+            return {
+                success: response,
+            };
+        }catch(error){
+            console.log(error);
+            return {
+                success: false,
+                error: error
+            };
+        }
+    }
+    //#endregion 创建
+    //#region 插入
+    async insertNewCase(table,data){
+        try{
+            //console.log(name);
+            const dateAdded = new Date();
+            var keys=Object.keys(data);
+            //var keys_str=keys.split(",");
+            const values=[];
+            const _values=[];
+            keys.forEach((key)=>{
+                values.push(data[key]);
+                _values.push("?");
+            });
+            const insertId = await new Promise((resolve,reject)=>{
+                const query = "REPLACE INTO "+table+" ("+keys.join()+") VALUES ("+_values.join()+");";
+                //console.log(query);
+                connection.query(query,values, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(insertId);
+            return {
+                success: true,
+                id: insertId,
+                createDate: dateAdded,
+            };
+        }catch(error){
+            console.log(error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+       async insertRow(table,data){
+        try{
+            //console.log(name);
+            const dateAdded = new Date();
+            var keys=Object.keys(data);
+            //var keys_str=keys.split(",");
+            const values=[];
+            const _values=[];
+            keys.forEach((key)=>{
+                values.push(data[key]);
+                _values.push("?");
+            });
+            const insertId = await new Promise((resolve,reject)=>{
+                const query = "REPLACE INTO "+table+" ("+keys.join()+") VALUES ("+_values.join()+");";
+                //console.log(query);
+                connection.query(query,values, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(insertId);
+            return {
+                success: true,
+                id: insertId,
+                createDate: dateAdded,
+            };
+        }catch(error){
+            console.log(error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+    async insertRows(table,datas){
+        try{
+            //console.log(name);
+            const dateAdded = new Date();
+            var queries=[];
+            var keys;
+            datas.forEach(data=>{
+                if(keys==undefined) keys=Object.keys(data);
+                const _values=[];
+                keys.forEach((key)=>{
+                    //console.log((data[key].constructor === String));
+                    var val=(data[key].constructor === String)?'"'+data[key]+'"':data[key];
+                    _values.push(val);
+                });
+                queries.push("("+_values.join()+")");
+            });
+            var query="REPLACE INTO `"+table+"` ("+keys.join()+") VALUES "+queries.join();
+            const insertId = await new Promise((resolve,reject)=>{
+                //console.log(query);
+                connection.query(query, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(insertId);
+            return {
+                success: true,
+                id: insertId,
+                createDate: dateAdded,
+            };
+        }catch(error){
+            console.log(error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+    async insertNewUser(user,pass){
+        try{
+            //console.log(name);
+            const dateAdded = new Date();
+            const insertId = await new Promise((resolve,reject)=>{
+                const query = "REPLACE INTO names (user,pass,position,level,createDate) VALUES (?, ?, ?, ?, ?);";
+                connection.query(query,[user,pass,"1",4,dateAdded], (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(insertId);
+            return {
+                id: insertId,
+                name : name,
+                createDate: dateAdded
+            };
+        }catch(error){
+            console.log(error);
+        }
+    }
+    //#endregion 插入
+    
+    //#region 删除
+    async removeRow(id,table){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                //console.log(table);
+                const query = `DELETE FROM `+table+` WHERE \`id\` = ?;`;
+                connection.query(query,id, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result);
+                    resolve(result);
+                });
+            });
+            
+            //console.log("typeof: "+(typeof response));
+            return {
+                success : response.length>0,
+                data: JSON.stringify(response[0])
+            };
+        }catch(error){
+            console.log(error);
+        }
+    }
+    async removeRows(ids,table){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                //console.log(table);
+                const query = `DELETE FROM `+table+` WHERE \`id\` IN (`+ids.join()+`);`;
+                connection.query(query, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result);
+                    resolve(result);
+                });
+            });
+            
+            //console.log("typeof: "+(typeof response));
+            return {
+                success : response.length>0,
+                data: JSON.stringify(response[0])
+            };
+        }catch(error){
+            console.log(error);
+        }
+    }
+    //#endregion 删除
+    //#region 功能
+    async login(name, pass){
+        try{
+            const response = await new Promise((resolve,reject)=>{
+                const query = `SELECT * FROM names WHERE user=? AND pass=?;`;
+                connection.query(query,[name,pass], (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result);
+                    resolve(result);
+                });
+            });
+            
+            //console.log("typeof: "+(typeof response));
+            return {
+                success : response.length>0,
+                data: JSON.stringify(response[0])
+            };
+        }catch(error){
+            console.log(error);
+        }
+    }
+    //#endregion 功能
+}
+
+module.exports = DbService;
+
+
+
+const express = require('express');
+const app = express();
+const cors = require('cors');
+const dotenv = require('dotenv');
+const $ = require("jquery");
+
+const path = require('path');
+const { env } = process;
+dotenv.config({
+    path: path.resolve(
+        __dirname,
+        `./env.${env.NODE_ENV ? env.NODE_ENV : "local"}`
+      ),
+});
+
+
+const DbService = require('./dbService');
+
+var corsOptions = {
+    origin: '*',
+    credentials:true,
+    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+  }
+
+app.use(cors(corsOptions)).use((req,res,next)=>{
+    console.log(req);
+    res.setHeader('Access-Control-Allow-Origin',"*");
+    next();
+});
+app.use(express.json());
+app.use(express.urlencoded({extended:false}));
+
+
+
+
+// create
+app.post('/insertUser',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {user} = request.body;
+    const {pass} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertNewUser(user,pass);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insert',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertRow(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insertAll',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertRows(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/createTable',cors(corsOptions),(request,response) => {
+    //console.log("request.body "+request.body.columns);
+    const {columns} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.createTable(table,columns);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.post('/insertCase',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {data} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.insertNewCase(table,data);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+
+// read
+app.get('/getAll',(request,response) => {
+    const db = DbService.getDbServiceInstance();
+    const result = db.getAllData();
+
+    result
+    .then(data => response.json({data:data}))
+    .catch(err => console.log(err));
+
+});
+app.post('/select',(request,response) => {
+    const {query} = request.body;
+    const db = DbService.getDbServiceInstance();
+    const result = db.select(query);
+
+    result
+    .then(data => response.json({data:data}))
+    .catch(err => console.log(err));
+
+});
+app.post('/getBasic',(request,response) => {
+    const {template} = request.body;
+    const {list} = request.body;
+    const results = {};
+    //console.log(template,list);
+    var keys=Object.keys(template);
+    keys.forEach((k)=>{
+        if(list==undefined || list.length==0 || list.includes(k)){
+            //console.log();
+            
+            const db = DbService.getDbServiceInstance();
+            const result = db.getBasic(template[k].tablename);
+            result
+            .then(data => {
+                console.log("in loop",k,data);
+                results[k]=data;
+            })
+            .catch(err => console.log(err));
+            
+        }else{
+            return;
+        }
+    });
+
+    return new Promise(resolve => {
+        const intervalId = setInterval(() => {
+            console.log('results',Object.keys(results).length);
+        if (Object.keys(results).length === Object.keys(template).length ||
+        (list.length>1 && Object.keys(results).length==list.length)) {
+            clearInterval(intervalId);
+            console.log('results',results);
+            resolve(results);
+            response.json({data:results});
+        }
+        }, 100);
+    });
+
+});
+
+// create
+app.post('/login',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {name} = request.body;
+    const {pass} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.login(name,pass);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+// update
+
+
+// delete
+app.post('/delete',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {id} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.removeRow(id,table);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+app.post('/deleteRows',(request,response) => {
+    //console.log("request.body "+request.header('Content-Type'));
+    const {ids} = request.body;
+    const {table} = request.body;
+    const  db= DbService.getDbServiceInstance();
+    const result = db.removeRows(ids,table);
+    result
+    .then(data => response.json({data:data}) )
+    .catch(err => console.log(err));
+});
+
+app.listen(process.env.PORT, () => console.log('app is runing at port: '+process.env.PORT))
