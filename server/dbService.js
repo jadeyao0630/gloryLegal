@@ -360,6 +360,42 @@ class DbService{
             console.log(error);
         }
     }
+    async insert(table,data){
+        try{
+            //console.log(name);
+            const dateAdded = new Date();
+            var keys=Object.keys(data);
+                const _values=[];
+                keys.forEach((key)=>{
+                    //console.log((data[key].constructor === String));
+                    var val=(data[key].constructor === String)?'"'+data[key]+'"':data[key];
+                    _values.push(val);
+                });
+            
+            var query="INSERT INTO `"+table+"` ("+keys.join()+") VALUES "+"("+_values.join()+")";
+            const insertId = await new Promise((resolve,reject)=>{
+                //console.log(query);
+                connection.query(query, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result.insertId);
+                    resolve(result);
+                });
+            });
+            
+            //console.log(insertId);
+            return {
+                success: true,
+                id: insertId,
+                createDate: dateAdded,
+            };
+        }catch(error){
+            console.log(error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
     //#endregion 插入
     
     //#region 删除
@@ -451,6 +487,14 @@ class DbService{
     async update(where,table,value){
         try{
             const response = await new Promise((resolve,reject)=>{
+                var vals=[];
+                if (value instanceof Object){
+                    var keys=Object.keys(value);
+                    keys.forEach((key)=>{
+                        vals.push(key+"=\""+value[key]+"\"");
+                    })
+                    value=vals.join();
+                }
                 const query = `UPDATE `+table+` SET `+value+` WHERE `+where;
                 connection.query(query, (err,result)=>{
                     if (err) reject(new Error(err.message));
@@ -461,7 +505,6 @@ class DbService{
             
             //console.log("typeof: "+(typeof response));
             return {
-                success: true,
                 data: response,
             };
         }catch(error){
