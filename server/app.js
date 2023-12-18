@@ -27,8 +27,8 @@ dotenv.config({
 
 const CryptoJS = require('crypto-js')
 
-const keyStr = '@glorypty'
-const ivStr = 'it@glorypty'
+const keyStr = 'it@glory.com'
+const ivStr = 'it@glory.com'
 
 function encrypt(data, keyS, ivS) {
   let key = keyS || keyStr
@@ -313,6 +313,26 @@ app.post('/insertCase',(request,response) => {
     });
 
 });
+app.post('/updateUser',(request,response) => {
+  //console.log("request.body "+request.header('Content-Type'));
+  const {data} = request.body;
+  const {where} = request.body;
+  const  db= DbService.getDbServiceInstance();
+  var vals=[];
+  if (data instanceof Object){
+      var keys=Object.keys(data);
+      if(keys.includes('_pass')&&data.hasOwnProperty('pass')) delete data.pass;
+      keys.forEach((key)=>{
+          vals.push(key+"=\""+data[key]+"\"");
+          if(key=='_pass') vals.push("pass=\""+encrypt(data[key])+"\"");
+      })
+      data=vals.join();
+  }
+  const result = db.updateUser(where,data);
+  result
+  .then(data => response.json({data:data}) )
+  .catch(err => console.log(err));
+});
 app.post('/update',(request,response) => {
     //console.log("request.body "+request.header('Content-Type'));
     const {data} = request.body;
@@ -388,8 +408,9 @@ app.post('/login',(request,response) => {
     //console.log("request.body "+request.header('Content-Type'));
     const {name} = request.body;
     const {pass} = request.body;
+    
     const  db= DbService.getDbServiceInstance();
-    const result = db.login(name,pass);
+    const result = db.login(name,encrypt(pass));
     result
     .then(data => response.json({data:data}) )
     .catch(err => console.log(err));

@@ -483,7 +483,28 @@ class DbService{
         }
     }
     //#endregion 删除
-
+    async updateUser(where,value){
+        try{
+            var query;
+            const response = await new Promise((resolve,reject)=>{
+                
+                query = `UPDATE names SET `+value+` WHERE `+where;
+                connection.query(query, (err,result)=>{
+                    if (err) reject(new Error(err.message));
+                    //console.log(result);
+                    resolve(result);
+                });
+            });
+            
+            //console.log("typeof: "+(typeof response));
+            return {
+                data: response,
+                query:query
+            };
+        }catch(error){
+            console.log(error);
+        }
+    }
     async update(where,table,value){
         try{
             var query;
