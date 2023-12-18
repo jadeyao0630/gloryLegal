@@ -138,7 +138,7 @@ class DbService{
         try{
             const response = await new Promise((resolve,reject)=>{
                 const query = "SELECT * FROM "+columnData.tablename+
-                    (columnData.conditions!=undefined?columnData.conditions:"");
+                    (columnData.conditions!=undefined?columnData.conditions:"")+" ORDER BY id DESC";
                 connection.query(query, (err,results)=>{
                     if (err) reject(new Error(err.message));
                     resolve(results);
@@ -486,6 +486,7 @@ class DbService{
 
     async update(where,table,value){
         try{
+            var query;
             const response = await new Promise((resolve,reject)=>{
                 var vals=[];
                 if (value instanceof Object){
@@ -495,7 +496,7 @@ class DbService{
                     })
                     value=vals.join();
                 }
-                const query = `UPDATE `+table+` SET `+value+` WHERE `+where;
+                query = `UPDATE `+table+` SET `+value+` WHERE `+where;
                 connection.query(query, (err,result)=>{
                     if (err) reject(new Error(err.message));
                     //console.log(result);
@@ -506,6 +507,7 @@ class DbService{
             //console.log("typeof: "+(typeof response));
             return {
                 data: response,
+                query:query
             };
         }catch(error){
             console.log(error);
