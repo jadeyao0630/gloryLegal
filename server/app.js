@@ -25,6 +25,39 @@ dotenv.config({
       ),
 });
 
+const CryptoJS = require('crypto-js')
+
+const keyStr = '@glorypty'
+const ivStr = 'it@glorypty'
+
+function encrypt(data, keyS, ivS) {
+  let key = keyS || keyStr
+  let iv = ivS || ivStr
+  key = CryptoJS.enc.Utf8.parse(key)
+  iv = CryptoJS.enc.Utf8.parse(iv)
+  const src = CryptoJS.enc.Utf8.parse(data)
+  const cipher = CryptoJS.AES.encrypt(src, key, {
+    iv: iv, // 初始向量
+    mode: CryptoJS.mode.CBC, // 加密模式
+    padding: CryptoJS.pad.Pkcs7, // 填充方式
+  })
+  const encrypted = cipher.toString()
+  return encrypted
+}
+
+function decrypt(data, keyS, ivS) {
+  let key = keyS || keyStr
+  let iv = ivS || ivStr
+  key = CryptoJS.enc.Utf8.parse(key)
+  iv = CryptoJS.enc.Utf8.parse(iv)
+  const cipher = CryptoJS.AES.decrypt(data, key, {
+    iv: iv,
+    mode: CryptoJS.mode.CBC,
+    padding: CryptoJS.pad.Pkcs7,
+  })
+  const decrypted = cipher.toString(CryptoJS.enc.Utf8) // 返回的是加密之前的原始数据->字符串类型
+  return decrypted
+}
 
 const DbService = require('./dbService');
 
